@@ -31,7 +31,7 @@ def workers_online(master):
     return [w for w in json.loads(body)["workers"] if w["enabled"]]
 
 
-def wait_for_workers(master, n, timeout=180):
+def wait_for_workers(master, n, timeout=600):
     t0 = time.time()
     while time.time() - t0 < timeout:
         try:

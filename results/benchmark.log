@@ -1,14 +1,57 @@
  Container lab1-master-1 Running 
  Container lab1-worker-1 Running 
- Container lab1-worker-2 Stopping 
- Container lab1-worker-3 Stopping 
- Container lab1-worker-4 Stopping 
- Container lab1-worker-3 Stopped 
- Container lab1-worker-3 Removing 
- Container lab1-worker-2 Stopped 
- Container lab1-worker-2 Removing 
- Container lab1-worker-3 Removed 
- Container lab1-worker-4 Stopped 
- Container lab1-worker-4 Removing 
- Container lab1-worker-2 Removed 
- Container lab1-worker-4 Removed 
+== 1 workers online: 172.18.0.6:50097
+   run 1: job 0, 216.74 s, 664 calls
+   run 2: job 1, 211.05 s, 664 calls
+   run 3: job 2, 218.04 s, 664 calls
+ Container lab1-master-1 Running 
+ Container lab1-worker-1 Running 
+ Container lab1-worker-2 Creating 
+ Container lab1-worker-2 Created 
+ Container lab1-worker-2 Starting 
+ Container lab1-worker-2 Started 
+== 2 workers online: 172.18.0.6:50097, 172.18.0.3:37181
+   run 1: job 3, 104.01 s, 664 calls
+   run 2: job 4, 113.57 s, 665 calls
+   run 3: job 5, 96.99 s, 665 calls
+ Container lab1-master-1 Running 
+ Container lab1-worker-1 Running 
+ Container lab1-worker-2 Running 
+ Container lab1-worker-4 Creating 
+ Container lab1-worker-3 Creating 
+ Container lab1-worker-3 Created 
+ Container lab1-worker-4 Created 
+ Container lab1-worker-3 Starting 
+ Container lab1-worker-3 Started 
+ Container lab1-worker-4 Starting 
+ Container lab1-worker-4 Started 
+== 4 workers online: 172.18.0.6:50097, 172.18.0.3:37181, 172.18.0.4:43759, 172.18.0.5:56309
+   run 1: job 6, 63.99 s, 667 calls
+   run 2: job 7, 59.55 s, 667 calls
+   run 3: job 8, 61.21 s, 667 calls
+ Container lab1-master-1 Running 
+ Container lab1-worker-1 Running 
+ Container lab1-worker-2 Running 
+ Container lab1-worker-3 Running 
+ Container lab1-worker-4 Running 
+ Container lab1-worker-5 Creating 
+ Container lab1-worker-6 Creating 
+ Container lab1-worker-8 Creating 
+ Container lab1-worker-7 Creating 
+ Container lab1-worker-6 Created 
+ Container lab1-worker-8 Created 
+ Container lab1-worker-7 Created 
+ Container lab1-worker-5 Created 
+ Container lab1-worker-7 Starting 
+ Container lab1-worker-7 Started 
+ Container lab1-worker-8 Starting 
+ Container lab1-worker-8 Started 
+ Container lab1-worker-5 Starting 
+ Container lab1-worker-5 Started 
+ Container lab1-worker-6 Starting 
+ Container lab1-worker-6 Started 
+== 8 workers online: 172.18.0.6:50097, 172.18.0.3:37181, 172.18.0.4:43759, 172.18.0.5:56309, 172.18.0.7:55667, 172.18.0.8:47259, 172.18.0.9:45111, 172.18.0.10:47391
+   run 1: job 9, 63.87 s, 672 calls
+   run 2: job 10, 54.79 s, 673 calls
+   run 3: job 11, 65.48 s, 673 calls
+saved results/results.csv

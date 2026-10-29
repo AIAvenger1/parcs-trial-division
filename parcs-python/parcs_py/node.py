@@ -183,7 +183,7 @@ class Heartbeat(Thread):
             dead_workers = []
             for worker in self.master_node.workers:
                 try:
-                    response = requests.get('http://%s:%s/api/internal/heartbeat' % (worker.ip, worker.port))
+                    response = requests.get('http://%s:%s/api/internal/heartbeat' % (worker.ip, worker.port), timeout=5)
                     if response.status_code != 200:
                         dead_workers.append(worker.id)
                 except Exception as e:
