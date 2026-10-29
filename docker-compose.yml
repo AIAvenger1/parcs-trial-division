@@ -1,0 +1,23 @@
+# Local PARCS cluster: one master + N workers on one machine.
+#   docker compose up -d --build --scale worker=4
+#   open http://localhost:8080
+services:
+  master:
+    build: ./parcs-python
+    image: parcs-node:local
+    environment:
+      PARCS_ARGS: "master"
+    ports:
+      - "8080:8080"
+    cpus: 1
+
+  worker:
+    build: ./parcs-python
+    image: parcs-node:local
+    environment:
+      # compose resolves the service name "master" to its container IP
+      PARCS_ARGS: "worker master"
+    depends_on:
+      - master
+    # one CPU per worker so N workers really means N cores
+    cpus: 1

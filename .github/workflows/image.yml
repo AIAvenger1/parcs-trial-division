@@ -1,0 +1,29 @@
+# Build the fixed PARCS-Python node image for amd64 (GCE VMs) and arm64
+# (Apple-silicon laptops) and publish it to GitHub Container Registry.
+name: parcs-node image
+on:
+  push:
+    branches: [main]
+    paths: ["parcs-python/**", ".github/workflows/image.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: parcs-python
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/parcs-node:latest

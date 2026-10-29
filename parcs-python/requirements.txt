@@ -1,0 +1,11 @@
+# Last releases that still support Python 2.7 (the PARCS core is py2-only).
+Pyro4==4.82
+serpent==1.28
+flask==1.1.4
+Werkzeug==1.0.1
+Jinja2==2.11.3
+MarkupSafe==1.1.1
+itsdangerous==1.1.0
+click==7.1.2
+requests==2.27.1
+py-cpuinfo==5.0.0
