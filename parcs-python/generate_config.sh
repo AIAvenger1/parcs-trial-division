@@ -3,7 +3,9 @@
 node_type=$1
 
 master_ip=$2
-self_ip=`hostname -I | cut -d' ' -f1`
+# PARCS_IP picks the address the node registers with (e.g. its private-network
+# address); by default it is the first address of the machine.
+self_ip=${PARCS_IP:-`hostname -I | cut -d' ' -f1`}
 
 echo '[Node]'
 

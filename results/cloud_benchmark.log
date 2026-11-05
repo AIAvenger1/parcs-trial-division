@@ -1,0 +1,26 @@
+running workers: parcs-worker1/parcs-1
+== 1 workers online: 10.10.0.4:55743
+   run 1: job 0, 149.86 s, 664 calls
+   run 2: job 1, 153.86 s, 664 calls
+   run 3: job 2, 151.83 s, 664 calls
+saved results/cloud/w1.csv
+running workers: parcs-worker1/parcs-1, parcs-worker2/parcs-1
+== 2 workers online: 10.10.0.4:55743, 10.10.0.5:51997
+   run 1: job 3, 82.41 s, 664 calls
+   run 2: job 4, 83.08 s, 665 calls
+   run 3: job 5, 83.03 s, 665 calls
+saved results/cloud/w2.csv
+running workers: parcs-worker1/parcs-1, parcs-worker2/parcs-1, parcs-worker1/parcs-2
+== 3 workers online: 10.10.0.4:55743, 10.10.0.5:51997, 10.10.0.4:60909
+   run 1: job 6, 54.76 s, 666 calls
+   run 2: job 7, 55.75 s, 665 calls
+   run 3: job 8, 54.32 s, 666 calls
+saved results/cloud/w3.csv
+running workers: parcs-worker1/parcs-1, parcs-worker2/parcs-1, parcs-worker1/parcs-2, parcs-worker2/parcs-2
+== 4 workers online: 10.10.0.4:55743, 10.10.0.5:51997, 10.10.0.4:60909, 10.10.0.5:43113
+   run 1: job 9, 43.98 s, 669 calls
+   run 2: job 10, 44.23 s, 667 calls
+   run 3: job 11, 43.44 s, 668 calls
+saved results/cloud/w4.csv
+running workers: parcs-worker1/parcs-1, parcs-worker2/parcs-1, parcs-worker1/parcs-2, parcs-worker2/parcs-2
+saved results/results_cloud.csv

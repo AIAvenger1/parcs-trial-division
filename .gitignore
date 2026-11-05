@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 .venv/
 results/last_output_*.txt
+hetzner/nodes.json
