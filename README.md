@@ -4,6 +4,7 @@
 Тема 6.3 — факторизація методом пробних дільників. Платформа — PARCS-Python,
 розгортання — кластер master + N worker у хмарі Hetzner Cloud (і локально в Docker Compose).
 
+- Репозиторій: https://github.com/AIAvenger1/parcs-trial-division
 - Код розв'язку: [`solution.py`](solution.py)
 - Виправлений PARCS-Python (Dockerfile, залежності): [`parcs-python/`](parcs-python/)
 - Скрипти: [`benchmark.py`](benchmark.py), [`plot.py`](plot.py), [`hetzner/`](hetzner/)
