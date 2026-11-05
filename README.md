@@ -10,6 +10,7 @@
 - Скрипти: [`benchmark.py`](benchmark.py), [`plot.py`](plot.py), [`hetzner/`](hetzner/)
 - Результати: [`results/`](results/)
 - Звіт у PDF: [`report/report.pdf`](report/report.pdf)
+- Презентація: [`presentation/parcs-trial-division.pptx`](presentation/parcs-trial-division.pptx)
 
 ## 1. Ідея алгоритму
 
