@@ -8,6 +8,7 @@
 - Виправлений PARCS-Python (Dockerfile, залежності): [`parcs-python/`](parcs-python/)
 - Скрипти: [`benchmark.py`](benchmark.py), [`plot.py`](plot.py), [`hetzner/`](hetzner/)
 - Результати: [`results/`](results/)
+- Звіт у PDF: [`report/report.pdf`](report/report.pdf)
 
 ## 1. Ідея алгоритму
 
@@ -71,167 +72,33 @@
 декоратором `@expose` викликаються на воркерах через `self.workers[i].метод(...)`;
 виклик асинхронний і повертає future з полями `ready` та `value`.
 
-## 3. Build-проблеми та як їх виправлено
+## 3. Кластер у хмарі
 
-Оригінальний репозиторій [Hummer12007/parcs-python](https://github.com/Hummer12007/parcs-python)
-не оновлювався з 2019 року, і зібрати його «як є» вже не можна. Готовий образ
-`hummer12007/parcs-node` з Docker Hub (2018 рік) досі працює на amd64-машинах
-GCE, але на Apple Silicon він запускається лише через емуляцію і значно
-повільніший. Тому образ зібрано заново — папка `parcs-python/` містить
-оригінальний код із такими правками:
+PARCS розгорнуто в Hetzner Cloud (локація Гельсінкі) на трьох віртуальних машинах CX23:
+2 vCPU, 4 ГБ пам'яті, Ubuntu 24.04. Машини з'єднані приватною мережею `10.10.0.0/24`.
 
-| Проблема | Прояв | Виправлення |
-|---|---|---|
-| `FROM debian:stretch-slim` — Debian 9 знято з підтримки, репозиторії видалено | `apt-get update` дає `404 Not Found`, `E: Failed to fetch …/dists/stretch/main/binary-amd64/Packages` | Базовий образ `python:2.7.18-slim`; apt взагалі не використовується |
-| Ядро PARCS написано лише під Python 2 (`imp`, `ConfigParser`, `Queue`, `Pyro4.async` — у Python ≥ 3.7 `async` є ключовим словом і дає `SyntaxError`) | Порт на Python 3 означав би переписати ядро | Залишено Python 2.7.18 (останній 2.x) |
-| `requirements.txt` без версій: сучасні Flask 2/3, Jinja2 3, Werkzeug 2, click 8, serpent 1.30.2 — лише для Python 3 | `pip install` падає: `No matching distribution found for serpent==1.30.2`, або Flask імпортується з помилкою | Зафіксовано останні версії з підтримкою 2.7: Pyro4 4.82, serpent 1.28, Flask 1.1.4, Werkzeug 1.0.1, Jinja2 2.11.3, MarkupSafe 1.1.1, itsdangerous 1.1.0, click 7.1.2, requests 2.27.1, py-cpuinfo 5.0.0 |
-| `netifaces` — C-розширення, для py2.7/arm64 немає wheel, потрібен gcc і заголовки Python | збирання падає на `error: command 'gcc' failed` | `network_utils.get_ip()` переписано через `socket` (UDP-connect без надсилання даних); залежність видалено |
-| `py-cpuinfo` ≥ 6 перейменував ключ `brand` на `brand_raw` | `KeyError: 'brand'` при старті вузла | Версія зафіксована і код читає будь-який із ключів із fallback на `platform.machine()` |
-| Heartbeat від master до worker без `timeout` у `requests.get` | Після зупинки воркера (VM або контейнера) master «зависає» на TCP-з'єднанні до мертвої IP на ~2 хв на кожного воркера; список вузлів оновлюється лише через кілька хвилин, наступна задача стартує із затримкою | `timeout=5` у heartbeat (`parcs_py/node.py`); мертвий воркер зникає зі списку за ~20 с |
-| Вузол реєструється з першою адресою машини (`hostname -I`), у хмарі це публічна адреса | Master не може достукатися до воркера через приватну мережу, або трафік іде назовні | Змінна `PARCS_IP` у `generate_config.sh` задає адресу, з якою вузол реєструється |
-| Образ лише для amd64 | На Apple Silicon — попередження про platform mismatch і емуляція | GitHub Actions збирає multi-arch образ (amd64 + arm64) і публікує в `ghcr.io/aiavenger1/parcs-node` |
-
-Після цього `docker build parcs-python/` проходить без apt і компілятора
-приблизно за 10 секунд.
-
-## 4. Запуск локально (Docker Compose)
-
-```bash
-git clone https://github.com/AIAvenger1/parcs-trial-division.git
-cd parcs-trial-division
-
-docker compose up -d --build --scale worker=4   # master + 4 workers
-open http://localhost:8080/workers              # список вузлів
-
-# один запуск вручну: Add Job -> solution.py + input.txt, результат у Jobs
-# або весь бенчмарк (сам масштабує воркерів, 3 запуски на кожну кількість):
-python3 benchmark.py --workers 1 2 4 8 --runs 3
-uv run --with matplotlib python3 plot.py        # results/plot.png + results/table.md
-
-docker compose down
-```
-
-У `docker-compose.yml` кожному контейнеру виділено рівно 1 CPU (`cpus: 1`),
-тому N воркерів справді означає N ядер. Порт 8080 прив'язано лише до
-`127.0.0.1`: вебінтерфейс PARCS виконує будь-який завантажений код і не має
-автентифікації, тож назовні його відкривати не можна.
-
-## 5. Розгортання в хмарі (Hetzner Cloud)
-
-Кластер розгорнуто в Hetzner Cloud, локація Гельсінкі: три віртуальні машини CX23
-(2 vCPU, 4 ГБ, Ubuntu 24.04) у приватній мережі `10.10.0.0/24`.
-
-| Вузол | Адреса в приватній мережі | Публічна адреса | Що запущено |
+| Вузол | Приватна адреса | Публічна адреса | Що запущено |
 |---|---|---|---|
-| `parcs-master` | 10.10.0.2 | так | master (вебінтерфейс на порту 8080), NAT для воркерів |
+| `parcs-master` | 10.10.0.2 | 89.167.57.71 | master, вебінтерфейс на порту 8080 |
 | `parcs-worker1` | 10.10.0.4 | немає | 2 процеси worker, кожен на своєму vCPU |
 | `parcs-worker2` | 10.10.0.5 | немає | 2 процеси worker, кожен на своєму vCPU |
 
 Проєкт Hetzner обмежений п'ятьма серверами, тому чотири воркери розміщено на двох
-машинах по два: worker у PARCS однопотоковий, і один процес на ядро використовує машину
-повністю. Кожен процес реєструється на master як окремий вузол зі своїм портом.
+машинах по два. Worker у PARCS однопотоковий, тож один процес на ядро використовує
+машину повністю. Кожен процес реєструється на master як окремий вузол зі своїм портом.
 
-Мінімально достатній пайплайн. Потрібні акаунт Hetzner Cloud, SSH-ключ, доданий у проєкт,
-і API-токен (консоль Hetzner, Security, API tokens, права Read & Write):
+Як це влаштовано:
 
-```bash
-echo '<токен>' > ~/.hcloud-token && chmod 600 ~/.hcloud-token
+- публічну адресу має лише master; воркери виходять в інтернет через нього (NAT), а по SSH
+  до них заходять стрибком через master;
+- вузли спілкуються приватною мережею: воркер реєструється на master за адресою
+  `10.10.0.2:8080`, а master викликає воркерів через Pyro4 за їхніми приватними адресами;
+- вебінтерфейс PARCS не має входу і виконує будь-який завантажений код, тому хмарний
+  фаєрвол пропускає ззовні тільки SSH, а інтерфейс відкривається через SSH-тунель;
+- усе створює і видаляє один скрипт, [`hetzner/cluster.py`](hetzner/cluster.py), через
+  Hetzner Cloud API.
 
-python3 hetzner/cluster.py up --workers 2        # мережа, фаєрвол, master і 2 воркерні VM
-python3 hetzner/cluster.py provision --per-vm 2  # NAT, Docker, збирання образу, запуск вузлів
-python3 hetzner/cluster.py status                # список вузлів
-
-# вебінтерфейс PARCS не має входу і виконує будь-який завантажений код,
-# тому назовні він закритий: заходимо через SSH-тунель
-$(python3 hetzner/cluster.py tunnel | head -1) &
-open http://localhost:8081/workers
-
-./hetzner/bench.sh 4 3                           # 1..4 воркери, по 3 запуски: results/results_cloud.csv
-python3 plot.py results/results_cloud.csv _cloud # results/plot_cloud.png, results/table_cloud.md
-
-python3 hetzner/cluster.py down                  # видалити все створене і зупинити оплату
-```
-
-Що робить скрипт [`hetzner/cluster.py`](hetzner/cluster.py):
-
-- створює приватну мережу, хмарний фаєрвол (ззовні дозволено лише SSH) і віртуальні машини;
-- публічну адресу дає тільки master; воркери виходять в інтернет через нього (маршрут
-  `0.0.0.0/0` у мережі Hetzner та NAT на master), а по SSH до них заходять стрибком через master;
-- на кожній машині ставить Docker, збирає образ із `parcs-python/` і запускає контейнер з
-  `--network host`; змінна `PARCS_IP` каже вузлу реєструватися з приватною адресою;
-- `scale N` залишає рівно N процесів worker (спершу по одному на машину, потім другі);
-  master сам прибирає зупинений воркер зі списку за ~20 с;
-- чіпає лише ресурси з міткою `project=parcs-lab1`, тож інші сервери проєкту в безпеці.
-
-Ціна: три CX23 коштують разом близько 0,03 євро за годину.
-
-### Альтернатива: Google Cloud
-
-Те саме можна розгорнути в Google Compute Engine за методичкою курсу; команди нижче
-підготовлені, але в цій роботі не запускалися.
-
-
-Потрібні: акаунт GCP з увімкненим білінгом
-(вистачає безкоштовного кредиту) і встановлений [gcloud CLI](https://cloud.google.com/sdk/docs/install).
-
-```bash
-# 0. вхід і проєкт
-gcloud auth login
-gcloud projects create parcs-lab-<ваше-прізвище>        # або існуючий
-gcloud config set project parcs-lab-<ваше-прізвище>
-gcloud services enable compute.googleapis.com          # потрібен увімкнений білінг
-gcloud config set compute/zone europe-central2-a       # Варшава
-
-# 1. фаєрвол: вебінтерфейс PARCS лише з вашої IP (він виконує будь-який завантажений код)
-gcloud compute firewall-rules create parcs-ui --direction=INGRESS --network=default \
-  --action=ALLOW --rules=tcp:8080 --source-ranges="$(curl -s https://api.ipify.org)/32" \
-  --target-tags=parcs-master
-# трафік між вузлами всередині VPC уже дозволений правилом default-allow-internal
-
-# 2. master
-gcloud compute instances create-with-container master \
-  --machine-type=e2-small --tags=parcs-master \
-  --container-image=ghcr.io/aiavenger1/parcs-node:latest \
-  --container-env=PARCS_ARGS="master"
-MASTER_INT=$(gcloud compute instances describe master --format='get(networkInterfaces[0].networkIP)')
-MASTER_EXT=$(gcloud compute instances describe master --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
-
-# 3. воркери (без зовнішніх IP — їм потрібен лише master)
-gcloud compute instances create-with-container worker1 worker2 worker3 worker4 \
-  --machine-type=e2-medium --no-address \
-  --container-image=ghcr.io/aiavenger1/parcs-node:latest \
-  --container-env=PARCS_ARGS="worker $MASTER_INT"
-
-# 4. перевірка: через ~1 хв усі воркери видно тут
-open "http://$MASTER_EXT:8080/workers"
-
-# 5. бенчмарк: кількість воркерів змінюємо зупинкою/запуском VM,
-#    master сам прибирає зупинений воркер після пропущеного heartbeat
-./gcp/scale.sh 1 && python3 benchmark.py --master "http://$MASTER_EXT:8080" --no-scale --workers 1
-./gcp/scale.sh 2 && python3 benchmark.py --master "http://$MASTER_EXT:8080" --no-scale --workers 2
-./gcp/scale.sh 4 && python3 benchmark.py --master "http://$MASTER_EXT:8080" --no-scale --workers 4
-
-# 6. не забути вимкнути: видаляє всі VM і правило фаєрволу
-./gcp/destroy.sh
-```
-
-Те саме одним скриптом: `WORKERS=4 ./gcp/deploy.sh` (кроки 1–3), `./gcp/scale.sh N`,
-`./gcp/destroy.sh`. Замість `ghcr.io/aiavenger1/parcs-node` можна вказати
-оригінальний `registry.hub.docker.com/hummer12007/parcs-node` — на amd64-машинах
-GCE він працює без перезбирання.
-
-Корисне: `gcloud compute instances list`, `gcloud compute ssh master`, всередині `docker ps`,
-`docker logs <container>`; `gcloud compute instances stop/start worker3`.
-
-## 6. Демонстрація вузлів
-
-Кластер у Hetzner Cloud: master і чотири воркери. Вузли реєструються на master самі через
-приватну мережу; список доступний у вебінтерфейсі `/workers` і через `GET /api/worker`.
-Воркери #0 і #1 працюють на `parcs-worker1` (10.10.0.4), #2 і #3 на `parcs-worker2` (10.10.0.5):
-
-![Вузли кластера у вебінтерфейсі PARCS](results/screenshots/cloud_workers.png)
-
-Список віртуальних машин (`python3 hetzner/cluster.py status`):
+Список машин, як його бачить Hetzner API (`python3 hetzner/cluster.py status`):
 
 ```
 NAME            STATUS    TYPE   PUBLIC IP        PRIVATE IP
@@ -240,12 +107,46 @@ parcs-worker1   running   cx23   -                10.10.0.4
 parcs-worker2   running   cx23   -                10.10.0.5
 ```
 
-Виконані задачі (`/jobs`): по 3 запуски на 1, 2, 3 і 4 воркерах, вихідний файл кожної
-доступний за посиланням `/api/job/<id>/output`:
+## 4. Демонстрація роботи
 
-![Задачі у вебінтерфейсі PARCS](results/screenshots/cloud_jobs.png)
+### Вузли master і worker
 
-Вихід розв'язку на 4 воркерах ([`results/cloud/output_w4.txt`](results/cloud/output_w4.txt)):
+Сторінка Nodes вебінтерфейсу master при одному, двох, трьох і чотирьох воркерах.
+Воркери з адресою 10.10.0.4 працюють на `parcs-worker1`, з адресою 10.10.0.5 на
+`parcs-worker2`. Кількість воркерів змінюється зупинкою і запуском процесів worker;
+зупинений воркер master сам прибирає зі списку після пропущеного heartbeat.
+
+![Вузли кластера при 1, 2, 3 і 4 воркерах](results/screenshots/cloud_scaling.png)
+
+### Виконання алгоритму на 1, 2, 3 і 4 воркерах
+
+Одне й те саме завдання (`solution.py` і `input.txt`: вісім 18-значних чисел) запущено
+по три рази для кожної кількості воркерів.
+
+| Воркери | Де працюють | Час трьох запусків, с | Викликів воркерів |
+|---:|---|---|---:|
+| 1 | worker1 | 149,9; 153,9; 151,8 | 664 |
+| 2 | worker1, worker2 | 82,4; 83,1; 83,0 | 664–665 |
+| 3 | worker1 (два процеси), worker2 | 54,8; 55,8; 54,3 | 665–666 |
+| 4 | worker1 і worker2, по два процеси | 44,0; 44,2; 43,4 | 667–669 |
+
+Останній рядок вихідного файлу для кожної кількості воркерів:
+
+```
+workers: 1, calls: 664, time: 151.83 s
+workers: 2, calls: 665, time: 83.03 s
+workers: 3, calls: 666, time: 54.32 s
+workers: 4, calls: 668, time: 43.44 s
+```
+
+Сторінка Jobs: кожен запуск має час старту, тривалість і посилання на код, вхідний та
+вихідний файли.
+
+![Задачі у вебінтерфейсі PARCS](results/screenshots/cloud_jobs.png){width=70%}
+
+Повний вихідний файл запуску на чотирьох воркерах
+([`results/cloud/output_w4.txt`](results/cloud/output_w4.txt)): усі вісім чисел розкладено
+на два простих множники.
 
 ```
 66759158378966927 = 250535683 * 266465669
@@ -259,11 +160,11 @@ parcs-worker2   running   cx23   -                10.10.0.5
 workers: 4, calls: 668, time: 43.44 s
 ```
 
-## 7. Результати
+## 5. Результати
 
 ### У хмарі (Hetzner Cloud)
 
-Умови: кластер із розділу 5, вхід `input.txt` (8 напівпростих, близько 1,32·10⁹ кандидатів).
+Умови: кластер із розділу 3, вхід `input.txt` (8 напівпростих, близько 1,32·10⁹ кандидатів).
 Для кожної кількості воркерів зроблено 3 запуски (`./hetzner/bench.sh 4 3`). Час береться з
 вихідного файлу розв'язку: він вимірюється на master від початку `solve()` до запису
 результату. Сирі дані: [`results/results_cloud.csv`](results/results_cloud.csv),
@@ -308,7 +209,144 @@ workers: 4, calls: 668, time: 43.44 s
 програма займала близько п'яти ядер, тому вісім контейнерів ділили ті самі чотири-п'ять
 вільних. Хмарні вимірювання цього недоліку не мають.
 
-### Висновки
+## 6. Build-проблеми та як їх виправлено
+
+Оригінальний репозиторій [Hummer12007/parcs-python](https://github.com/Hummer12007/parcs-python)
+не оновлювався з 2019 року, і зібрати його «як є» вже не можна. Готовий образ
+`hummer12007/parcs-node` з Docker Hub (2018 рік) досі працює на amd64-машинах
+GCE, але на Apple Silicon він запускається лише через емуляцію і значно
+повільніший. Тому образ зібрано заново — папка `parcs-python/` містить
+оригінальний код із такими правками:
+
+| Проблема | Прояв | Виправлення |
+|---|---|---|
+| `FROM debian:stretch-slim` — Debian 9 знято з підтримки, репозиторії видалено | `apt-get update` дає `404 Not Found`, `E: Failed to fetch …/dists/stretch/main/binary-amd64/Packages` | Базовий образ `python:2.7.18-slim`; apt взагалі не використовується |
+| Ядро PARCS написано лише під Python 2 (`imp`, `ConfigParser`, `Queue`, `Pyro4.async` — у Python ≥ 3.7 `async` є ключовим словом і дає `SyntaxError`) | Порт на Python 3 означав би переписати ядро | Залишено Python 2.7.18 (останній 2.x) |
+| `requirements.txt` без версій: сучасні Flask 2/3, Jinja2 3, Werkzeug 2, click 8, serpent 1.30.2 — лише для Python 3 | `pip install` падає: `No matching distribution found for serpent==1.30.2`, або Flask імпортується з помилкою | Зафіксовано останні версії з підтримкою 2.7: Pyro4 4.82, serpent 1.28, Flask 1.1.4, Werkzeug 1.0.1, Jinja2 2.11.3, MarkupSafe 1.1.1, itsdangerous 1.1.0, click 7.1.2, requests 2.27.1, py-cpuinfo 5.0.0 |
+| `netifaces` — C-розширення, для py2.7/arm64 немає wheel, потрібен gcc і заголовки Python | збирання падає на `error: command 'gcc' failed` | `network_utils.get_ip()` переписано через `socket` (UDP-connect без надсилання даних); залежність видалено |
+| `py-cpuinfo` ≥ 6 перейменував ключ `brand` на `brand_raw` | `KeyError: 'brand'` при старті вузла | Версія зафіксована і код читає будь-який із ключів із fallback на `platform.machine()` |
+| Heartbeat від master до worker без `timeout` у `requests.get` | Після зупинки воркера (VM або контейнера) master «зависає» на TCP-з'єднанні до мертвої IP на ~2 хв на кожного воркера; список вузлів оновлюється лише через кілька хвилин, наступна задача стартує із затримкою | `timeout=5` у heartbeat (`parcs_py/node.py`); мертвий воркер зникає зі списку за ~20 с |
+| Вузол реєструється з першою адресою машини (`hostname -I`), у хмарі це публічна адреса | Master не може достукатися до воркера через приватну мережу, або трафік іде назовні | Змінна `PARCS_IP` у `generate_config.sh` задає адресу, з якою вузол реєструється |
+| Образ лише для amd64 | На Apple Silicon — попередження про platform mismatch і емуляція | GitHub Actions збирає multi-arch образ (amd64 + arm64) і публікує в `ghcr.io/aiavenger1/parcs-node` |
+
+Після цього `docker build parcs-python/` проходить без apt і компілятора
+приблизно за 10 секунд.
+
+## 7. Як повторити
+
+### У Hetzner Cloud
+
+Потрібні акаунт Hetzner Cloud, SSH-ключ, доданий у проєкт, і API-токен з правами
+Read & Write (консоль Hetzner, Security, API tokens).
+
+```bash
+echo '<токен>' > ~/.hcloud-token
+chmod 600 ~/.hcloud-token
+
+# мережа, фаєрвол, master і дві воркерні машини
+python3 hetzner/cluster.py up --workers 2
+
+# NAT, Docker, збирання образу, запуск вузлів
+python3 hetzner/cluster.py provision --per-vm 2
+
+# тунель до вебінтерфейсу: команду друкує сам скрипт
+python3 hetzner/cluster.py tunnel
+open http://localhost:8081/workers
+
+# 1..4 воркери, по 3 запуски, потім таблиця і графік
+./hetzner/bench.sh 4 3
+python3 plot.py results/results_cloud.csv _cloud
+
+# видалити все створене і зупинити оплату
+python3 hetzner/cluster.py down
+```
+
+Скрипт чіпає лише ресурси з міткою `project=parcs-lab1`. Три машини CX23 коштують разом
+близько 0,03 євро за годину.
+
+### Локально в Docker Compose
+
+```bash
+git clone https://github.com/AIAvenger1/parcs-trial-division.git
+cd parcs-trial-division
+
+# master + 4 workers, список вузлів
+docker compose up -d --build --scale worker=4
+open http://localhost:8080/workers
+
+# один запуск вручну: Add Job, файли solution.py та input.txt, результат у Jobs.
+# Або весь бенчмарк: сам масштабує воркерів, 3 запуски на кожну кількість
+python3 benchmark.py --workers 1 2 4 8 --runs 3
+uv run --with matplotlib python3 plot.py
+
+docker compose down
+```
+
+У `docker-compose.yml` кожному контейнеру виділено рівно 1 CPU (`cpus: 1`),
+тому N воркерів справді означає N ядер. Порт 8080 прив'язано лише до
+`127.0.0.1`: вебінтерфейс PARCS виконує будь-який завантажений код і не має
+автентифікації, тож назовні його відкривати не можна.
+
+### У Google Cloud
+
+Те саме можна розгорнути в Google Compute Engine за методичкою курсу; команди нижче
+підготовлені, але в цій роботі не запускалися.
+
+Потрібні: акаунт GCP з увімкненим білінгом
+(вистачає безкоштовного кредиту) і встановлений [gcloud CLI](https://cloud.google.com/sdk/docs/install).
+
+```bash
+# 0. вхід і проєкт
+gcloud auth login
+gcloud projects create parcs-lab-<ваше-прізвище>
+gcloud config set project parcs-lab-<ваше-прізвище>
+gcloud services enable compute.googleapis.com
+gcloud config set compute/zone europe-central2-a
+
+# 1. фаєрвол: вебінтерфейс PARCS лише з вашої IP
+gcloud compute firewall-rules create parcs-ui \
+  --direction=INGRESS --network=default --action=ALLOW --rules=tcp:8080 \
+  --source-ranges="$(curl -s https://api.ipify.org)/32" \
+  --target-tags=parcs-master
+
+# 2. master
+gcloud compute instances create-with-container master \
+  --machine-type=e2-small --tags=parcs-master \
+  --container-image=ghcr.io/aiavenger1/parcs-node:latest \
+  --container-env=PARCS_ARGS="master"
+MASTER_INT=$(gcloud compute instances describe master \
+  --format='get(networkInterfaces[0].networkIP)')
+MASTER_EXT=$(gcloud compute instances describe master \
+  --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+
+# 3. воркери (без зовнішніх IP — їм потрібен лише master)
+gcloud compute instances create-with-container worker1 worker2 worker3 worker4 \
+  --machine-type=e2-medium --no-address \
+  --container-image=ghcr.io/aiavenger1/parcs-node:latest \
+  --container-env=PARCS_ARGS="worker $MASTER_INT"
+
+# 4. перевірка: через ~1 хв усі воркери видно тут
+open "http://$MASTER_EXT:8080/workers"
+
+# 5. бенчмарк: кількість воркерів змінюємо зупинкою і запуском VM
+M="http://$MASTER_EXT:8080"
+./gcp/scale.sh 1 && python3 benchmark.py --master $M --no-scale --workers 1
+./gcp/scale.sh 2 && python3 benchmark.py --master $M --no-scale --workers 2
+./gcp/scale.sh 4 && python3 benchmark.py --master $M --no-scale --workers 4
+
+# 6. не забути вимкнути: видаляє всі VM і правило фаєрволу
+./gcp/destroy.sh
+```
+
+Те саме одним скриптом: `WORKERS=4 ./gcp/deploy.sh` (кроки 1–3), `./gcp/scale.sh N`,
+`./gcp/destroy.sh`. Замість `ghcr.io/aiavenger1/parcs-node` можна вказати
+оригінальний `registry.hub.docker.com/hummer12007/parcs-node` — на amd64-машинах
+GCE він працює без перезбирання.
+
+Корисне: `gcloud compute instances list`, `gcloud compute ssh master`, всередині `docker ps`,
+`docker logs <container>`; `gcloud compute instances stop/start worker3`.
+
+## 8. Висновки
 
 Факторизацію методом пробних дільників реалізовано в PARCS-Python як динамічний
 розподіл шматків діапазону дільників між воркерами з відсіканням після кожного
@@ -319,7 +357,7 @@ workers: 4, calls: 668, time: 43.44 s
 SSH-тунель. На чотирьох воркерах у хмарі задача виконується у 3,46 раза швидше, ніж на
 одному, за 44 секунди замість 152.
 
-## 8. Посилання
+## 9. Посилання
 
 - Репозиторій: https://github.com/AIAvenger1/parcs-trial-division
 - PARCS-Python (оригінал): https://github.com/Hummer12007/parcs-python

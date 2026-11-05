@@ -10,6 +10,11 @@ fontsize: 11pt
 geometry: margin=2cm
 colorlinks: true
 header-includes:
-  - \usepackage{float}
-  - \floatplacement{figure}{H}
+  - |
+    ```{=latex}
+    \usepackage{float}
+    \floatplacement{figure}{H}
+    \RecustomVerbatimEnvironment{Highlighting}{Verbatim}{fontsize=\footnotesize,commandchars=\\\{\}}
+    \RecustomVerbatimEnvironment{verbatim}{Verbatim}{fontsize=\footnotesize}
+    ```
 ---
